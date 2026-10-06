@@ -1,0 +1,74 @@
+# ==============================
+# Java / Maven
+# ==============================
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Maven wrapper JAR should be allowed
+!**/.mvn/wrapper/maven-wrapper.jar
+
+
+# ==============================
+# IntelliJ IDEA
+# ==============================
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+
+# ==============================
+# Eclipse / STS
+# ==============================
+.classpath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+
+# ==============================
+# VS Code
+# ==============================
+.vscode/
+
+
+# ==============================
+# Logs
+# ==============================
+*.log
+logs/
+
+
+# ==============================
+# Environment / Secrets
+# ==============================
+.env
+.env.*
+*.env
+
+# Local secret/config override files
+application-local.properties
+application-local.yml
+application-local.yaml
+
+
+# ==============================
+# Operating System
+# ==============================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# ==============================
+# Temporary files
+# ==============================
+*.tmp
+*.temp
+*.swp
+*~
