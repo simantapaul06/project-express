@@ -8,12 +8,149 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
-
-      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  config-server:
+    image: project-express-config-server:1.0
+    container_name: project-express-config-server
+    ports:
+      - "8888:8888"
+    environment:
+      SPRING_PROFILES_ACTIVE: native
+      SPRING_CLOUD_CONFIG_SERVER_NATIVE_SEARCH_LOCATIONS: file:/config/
+    volumes:
+      - ./projectexpress-config:/config:ro
+
+  auth-service:
+    image: project-express-auth-service:1.0
+    container_name: project-express-auth
+    restart: on-failure
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      SPRING_DATASOURCE_URL: "jdbc:mysql://host.docker.internal:3306/auth_db?createDatabaseIfNotExist=true"
+      JWT_SECRET: ${JWT_SECRET}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - config-server
+      - discovery-server
+
+  discovery-server:
+    image: project-express-discovery-server:1.0
+    container_name: project-express-discovery-server
+    ports:
+      - "8761:8761"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+    depends_on:
+      - config-server
+
+  job-service:
+    image: project-express-job-service:1.0
+    container_name: project-express-job
+    restart: on-failure
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      SPRING_DATASOURCE_URL: "jdbc:mysql://host.docker.internal:3306/job_db?createDatabaseIfNotExist=true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      - config-server
+      - discovery-server
+      - kafka
+
+  application-service:
+    image: project-express-application-service:1.0
+    container_name: project-express-application
+    restart: on-failure
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      SPRING_DATASOURCE_URL: "jdbc:mysql://host.docker.internal:3306/application_db?createDatabaseIfNotExist=true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      - config-server
+      - discovery-server
+      - kafka
+      - auth-service
+      - job-service
+
+  profile-service:
+    image: project-express-profile-service:1.0
+    container_name: project-express-profile
+    restart: on-failure
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      SPRING_DATASOURCE_URL: "jdbc:mysql://host.docker.internal:3306/profile_db?createDatabaseIfNotExist=true"
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      STORAGE_S3_ENDPOINT: http://host.docker.internal:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+    depends_on:
+      - config-server
+      - discovery-server
+      - kafka
+
+  notification-service:
+    image: project-express-notification-service:1.0
+    container_name: project-express-notification
+    restart: on-failure
+
+    ports:
+      - "8084:8084"
+
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/notification_db?createDatabaseIfNotExist=true
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET: ${JWT_SECRET}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+
+    depends_on:
+      - config-server
+      - discovery-server
+      - kafka
+
+  api-gateway:
+    image: project-express-api-gateway:1.0
+    container_name: project-express-api-gateway
+    restart: on-failure
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET}
+
+    depends_on:
+      - config-server
+      - discovery-server

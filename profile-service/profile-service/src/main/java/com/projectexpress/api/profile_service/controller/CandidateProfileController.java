@@ -40,6 +40,10 @@ public class CandidateProfileController {
         return ResponseEntity.ok(candidateProfileService.getMyProfile(user.getUserId()));
     }
 
+
+    //******************************************
+    // Profile Photo
+    //******************************************
     @PostMapping(
             value = "/me/photo",
             consumes = "multipart/form-data"
@@ -83,6 +87,11 @@ public class CandidateProfileController {
         return ResponseEntity.noContent().build();
     }
 
+
+
+    //******************************************
+    // Resume
+    //******************************************
     @PostMapping(
             value = "/me/resume",
             consumes = "multipart/form-data"
