@@ -70,6 +70,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: 6379
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin:9411/api/v2/spans"
     depends_on:
       - config-server
       - discovery-server
@@ -166,6 +168,13 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
+      
+  zipkin:
+    image: openzipkin/zipkin:3
+    container_name: project-express-zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
       
 volumes:
   redis-data:
