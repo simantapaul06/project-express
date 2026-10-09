@@ -32,35 +32,30 @@ public class JobController {
 
         AuthenticatedUser authenticatedUser = (AuthenticatedUser) authentication.getPrincipal();
 
-        Job job = jobService.createJob(request,authenticatedUser.getUserId());
-        return ResponseEntity.ok(jobMapper.toJobResponse(job));
+        JobResponse job = jobService.createJob(request,authenticatedUser.getUserId());
+        return ResponseEntity.ok(job);
     }
 
     @GetMapping
     public ResponseEntity<List<JobResponse>> getAllJobs() {
 
-        List<JobResponse> jobs = jobService.getAllJobs()
-                .stream()
-                .map(jobMapper::toJobResponse)
-                .toList();
-
+        List<JobResponse> jobs = jobService.getAllJobs();
         return ResponseEntity.ok(jobs);
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<JobResponse> getJobById(@PathVariable Long id) {
 
-        Job job = jobService.getJobById(id);
-        return ResponseEntity.ok(jobMapper.toJobResponse(job));
+        JobResponse jobResponse = jobService.getJobById(id);
+        return ResponseEntity.ok(jobResponse);
     }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<JobResponse> updateJob(@PathVariable Long id, @Valid @RequestBody JobUpdateRequest request) {
 
-        Job job = jobService.updateJob(id, request);
-
-        return ResponseEntity.ok(jobMapper.toJobResponse(job));
+        JobResponse jobResponse = jobService.updateJob(id, request);
+        return ResponseEntity.ok(jobResponse);
     }
 
     @PreAuthorize("hasRole('ADMIN')")

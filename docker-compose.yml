@@ -68,6 +68,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
     depends_on:
       - config-server
       - discovery-server
@@ -154,3 +156,16 @@ services:
     depends_on:
       - config-server
       - discovery-server
+
+  redis:
+    image: redis:7-alpine
+    container_name: project-express-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+      
+volumes:
+  redis-data:
