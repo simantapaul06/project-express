@@ -1,5 +1,10 @@
 pipeline {
     agent any
+	
+	environment {
+		DOCKER_HOST = 'npipe:////./pipe/dockerDesktopLinuxEngine'
+		PATH = "C:\\Users\\siman\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin;${env.PATH}"
+    }
 
     options {
         timestamps()
