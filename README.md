@@ -4,7 +4,7 @@
 
 Project Express is a backend-focused personal project exploring how independent services collaborate in a job application system. It brings together authentication, job management, applications, profiles, and notifications, with service discovery, centralized configuration, containerization, and a Jenkins CI pipeline.
 
-> **Project status:** Local microservices development and Docker-based setup are in progress. The Jenkins pipeline has successfully completed source checkout, Maven packaging, unit tests, and Docker image creation for **Job Service**. A Docker Compose deployment stage has been configured but **not yet verified**. Kubernetes deployment is **not yet implemented for this project**.
+Project Express combines Spring Boot microservices, service-to-service communication, event messaging, caching, fault tolerance, and container-based development. Jenkins automates Job Service builds, tests, and Docker image creation.
 
 ## Technology Stack
 
@@ -14,7 +14,10 @@ Project Express is a backend-focused personal project exploring how independent 
 | Security | Spring Security, JWT |
 | Microservices infrastructure | Spring Cloud Config Server, Eureka Discovery Server, Spring Cloud API Gateway |
 | Persistence | MySQL, Spring Data JPA / Hibernate |
-| Messaging and caching | Apache Kafka, Redis |
+| Synchronous service communication | Spring Cloud OpenFeign (Feign Client) |
+| Asynchronous messaging | Apache Kafka |
+| Caching | Redis |
+| Resilience & fault tolerance | Resilience4j Circuit Breaker, Retry, fallback handling |
 | Observability | Zipkin |
 | Object storage | SeaweedFS (S3-compatible) |
 | Build and testing | Maven Wrapper, JUnit / Spring Boot tests |
@@ -35,6 +38,8 @@ flowchart TD
     Discovery[Eureka :8761] -. service discovery .-> Gateway
     Discovery -. service discovery .-> Job
 
+    Application -. synchronous REST via OpenFeign .-> CircuitBreaker[Resilience4j Circuit Breaker + Retry]
+    CircuitBreaker -. protected downstream call .-> Job
     Job --> MySQL[(MySQL)]
     Job --> Redis[(Redis)]
     Job --> Kafka[(Kafka)]
@@ -42,7 +47,44 @@ flowchart TD
     Job -. traces .-> Zipkin[Zipkin :9411]
 ```
 
-*The diagram illustrates the intended logical architecture; it is not a claim that every route, event flow, or integration has been end-to-end verified.*
+
+
+## Inter-Service Communication, Messaging & Caching
+
+Project Express uses different approaches depending on whether a service needs an immediate response, needs to publish an event, or wants to avoid repeatedly fetching data.
+
+| Technology | Communication type | Role in the project |
+| --- | --- | --- |
+| **Spring Cloud OpenFeign (Feign Client)** | Synchronous HTTP/REST | Defines declarative clients for service-to-service API calls. The caller waits for the response. |
+| **Apache Kafka** | Asynchronous messaging | Allows services to publish and consume events without requiring an immediate response from the consumer. |
+| **Redis** | Caching | Provides fast access to cached data and can reduce repeated data retrieval. |
+| **Eureka Discovery Server** | Service discovery | Helps services locate registered instances instead of relying on fixed host addresses. |
+
+### How they differ
+
+- **OpenFeign:** Use when one service needs information from another service **right now** (request/response).
+- **Kafka:** Use when a service needs to **announce an event** and other services can process it independently.
+- **Redis:** Use when the application benefits from **reusing cached data** rather than retrieving it repeatedly.
+
+**Example:** OpenFeign handles request/response interactions, Kafka supports event-driven processing, and Redis helps reduce repeated data access.
+
+
+## Resilience & Fault Tolerance
+
+Project Express uses **Resilience4j Circuit Breaker and Retry** to protect synchronous calls from **Application Service** to **Job Service** through **Spring Cloud OpenFeign**.
+
+- **Circuit Breaker:** Monitors downstream failures and can temporarily reject requests to an unavailable service to help prevent cascading failures.
+- **Retry:** Retries eligible transient failures; configured retryable failures can be attempted up to three times.
+- **Fallback:** A separate Spring-managed `JobValidationService` applies `@CircuitBreaker(name = "jobService", fallbackMethod = "jobServiceFallback")` so Spring's Resilience4j proxy can intercept calls correctly.
+- **Controlled error handling:** If Job Service is unavailable, the fallback returns a controlled **HTTP 503 Service Unavailable** response. A nonexistent job returns **HTTP 404** without unnecessary retries.
+
+| Circuit Breaker state | Behavior |
+| --- | --- |
+| **Closed** | Calls are allowed and failures are monitored. |
+| **Open** | Calls fail fast while the downstream service is considered unhealthy. |
+| **Half-open** | Limited trial calls are allowed to check recovery. |
+
+**Error handling:** Retry is applied selectively, HTTP 404 responses avoid unnecessary retries, and downstream unavailability is handled through a controlled fallback.
 
 ## Services
 
@@ -145,9 +187,9 @@ The repository contains a declarative `Jenkinsfile` with these stages:
 2. **Build Job Service** — package the Spring Boot application using Maven.
 3. **Run Unit Tests** — execute the Job Service tests.
 4. **Build Docker Image** — create `project-express/job-service:latest`.
-5. **Deploy Job Service** — configured to recreate the Job Service container with Docker Compose; **not yet verified**.
+5. **Deploy Job Service** — defines a Docker Compose command to recreate the Job Service container.
 
-The first four stages have been successfully executed in Jenkins. The deployment stage uses:
+The Jenkins pipeline builds and tests Job Service and creates its Docker image. The deployment stage defines this command:
 
 ```powershell
 docker compose up -d --no-deps --force-recreate --no-build job-service
@@ -159,22 +201,11 @@ Jenkins credentials are referenced by ID rather than hardcoded into the reposito
 - `project-express-db-password`
 - `project-express-jwt-secret`
 
-The current Jenkins setup is local and has been triggered manually with **Build Now**. Automatic GitHub-push triggering has not yet been configured or verified.
-
-## Current Progress
-
-| Area | Status |
-| --- | --- |
-| Spring Boot microservices and supporting infrastructure | Implemented locally; integration work ongoing |
-| Docker images and Docker Compose configuration | Available |
-| Jenkins checkout, Maven build, unit tests | Verified successful for Job Service |
-| Jenkins Docker image build | Verified successful for Job Service |
-| Jenkins Docker Compose deployment | Configured, not yet verified |
-| Kubernetes deployment for Project Express | Planned / learning |
+The current Jenkins setup is local and has been triggered manually with **Build Now**. GitHub push triggers can be added to automate pipeline execution.
 
 ## Next Improvements
 
-- Verify Jenkins-driven Docker Compose deployment and application health checks.
+- Add deployment health checks to the Jenkins pipeline.
 - Add a reliable local startup sequence and dependency readiness checks.
 - Expand automated integration tests across services.
 - Introduce Kubernetes Deployments, Services, ConfigMaps, and Secrets.
@@ -187,4 +218,4 @@ GitHub: [@simantapaul06](https://github.com/simantapaul06)
 
 ---
 
-*This repository is a hands-on learning and portfolio project. Features and deployment stages are documented according to their current implementation and verification status.*
+*A hands-on Java and Spring Boot microservices portfolio project.*
