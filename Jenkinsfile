@@ -33,6 +33,14 @@ pipeline {
                 }
             }
         }
+		
+		stage('Build Docker Image') {
+			steps {
+				dir('job-service/job-service') {
+					bat 'docker build -t project-express/job-service:latest .'
+				}
+			}
+		}
     }
 
     post {
