@@ -42,8 +42,10 @@ flowchart TD
     CircuitBreaker -. protected downstream call .-> Job
     Job --> MySQL[(MySQL)]
     Job --> Redis[(Redis)]
-    Job --> Kafka[(Kafka)]
-    Kafka -. events .-> Notification
+    Auth -->|publishes user registration event| Kafka[(Kafka :9092)]
+    Kafka -->|registration event| Profile
+    Application -->|publishes JobApplicationCreatedEvent| Kafka
+    Kafka -->|job-application-created topic| Notification
     Job -. traces .-> Zipkin[Zipkin :9411]
 ```
 
@@ -56,7 +58,7 @@ Project Express uses different approaches depending on whether a service needs a
 | Technology | Communication type | Role in the project |
 | --- | --- | --- |
 | **Spring Cloud OpenFeign (Feign Client)** | Synchronous HTTP/REST | Defines declarative clients for service-to-service API calls. The caller waits for the response. |
-| **Apache Kafka** | Asynchronous messaging | Allows services to publish and consume events without requiring an immediate response from the consumer. |
+| **Apache Kafka** | Asynchronous messaging | Auth Service publishes user-registration events consumed by Profile Service; Application Service publishes job-application events consumed by Notification Service. |
 | **Redis** | Caching | Provides fast access to cached data and can reduce repeated data retrieval. |
 | **Eureka Discovery Server** | Service discovery | Helps services locate registered instances instead of relying on fixed host addresses. |
 
@@ -66,8 +68,27 @@ Project Express uses different approaches depending on whether a service needs a
 - **Kafka:** Use when a service needs to **announce an event** and other services can process it independently.
 - **Redis:** Use when the application benefits from **reusing cached data** rather than retrieving it repeatedly.
 
-**Example:** OpenFeign handles request/response interactions, Kafka supports event-driven processing, and Redis helps reduce repeated data access.
+**In Project Express:** Application Service uses OpenFeign to communicate synchronously with Job Service. When a user registers, Auth Service publishes a Kafka event consumed by Profile Service to create the user profile. After a job application is saved, Application Service publishes a separate Kafka event that Notification Service processes asynchronously. Redis helps reduce repeated data access.
 
+
+### Kafka event flow: Auth Service → Profile Service
+
+1. A new user registers through **Auth Service** (`8081`).
+2. Auth Service publishes a **user-registration event** to Kafka.
+3. **Profile Service** (`8085`) consumes the registration event.
+4. Profile Service creates the corresponding user profile.
+
+This is **asynchronous**: Auth Service publishes the event rather than requiring a direct REST call to Profile Service. The exact event class and topic name are intentionally omitted here.
+
+### Kafka event flow: Application Service → Notification Service
+
+1. A candidate submits a job application to **Application Service** (`8083`).
+2. Application Service saves the application in MySQL.
+3. Application Service publishes a **`JobApplicationCreatedEvent`** to Kafka topic **`job-application-created`**.
+4. **Notification Service** (`8084`) consumes the event using **`@KafkaListener`**.
+5. Notification Service processes the event and saves the notification.
+
+This is **asynchronous**: Application Service publishes the event without making a direct REST call to Notification Service.
 
 ## Resilience & Fault Tolerance
 
@@ -91,11 +112,11 @@ Project Express uses **Resilience4j Circuit Breaker and Retry** to protect synch
 | Component | Local port | Responsibility |
 | --- | ---: | --- |
 | API Gateway | 8080 | Entry point and routing |
-| Auth Service | 8081 | Authentication and JWT-related functionality |
+| Auth Service | 8081 | Authentication, JWT, and publishing user-registration events |
 | Job Service | 8082 | Job-related backend functionality |
 | Application Service | 8083 | Job application functionality |
 | Notification Service | 8084 | Notification-related functionality |
-| Profile Service | 8085 | Profile-related functionality |
+| Profile Service | 8085 | Profile management and consuming registration events to create profiles |
 | Eureka Discovery Server | 8761 | Service registration and discovery |
 | Spring Cloud Config Server | 8888 | Centralized application configuration |
 | Kafka | 9092 | Event messaging |
