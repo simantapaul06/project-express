@@ -55,7 +55,7 @@ services:
       - config-server
 
   job-service:
-    image: project-express-job-service:1.0
+    image: project-express-job-service:latest
     container_name: project-express-job
     restart: on-failure
     ports:
